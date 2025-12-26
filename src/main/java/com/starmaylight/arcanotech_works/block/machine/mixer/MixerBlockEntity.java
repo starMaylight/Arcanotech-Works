@@ -3,6 +3,8 @@ package com.starmaylight.arcanotech_works.block.machine.mixer;
 import com.starmaylight.arcanotech_works.block.machine.AbstractMachineBlockEntity;
 import com.starmaylight.arcanotech_works.block.machine.MachineTier;
 import com.starmaylight.arcanotech_works.blockentity.ModBlockEntities;
+import com.starmaylight.arcanotech_works.recipe.MixerRecipe;
+import com.starmaylight.arcanotech_works.recipe.ModRecipes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -14,9 +16,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
@@ -26,6 +26,8 @@ import net.minecraftforge.fluids.capability.templates.FluidTank;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Optional;
 
 /**
  * 混合機のBlockEntity
@@ -53,17 +55,22 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
     public static final int TANK_CAPACITY = 4000;
 
     // 処理パラメータ
-    private static final int BASE_PROCESS_TIME = 200;  // 10秒
     private static final int MANA_CAPACITY = 15000;
     private static final int MANA_MAX_INPUT = 150;
     private static final int MANA_PER_OPERATION = 60;
     private static final int HEAT_PER_OPERATION = 8;
+
+    // 現在のレシピキャッシュ
+    private MixerRecipe currentRecipe = null;
 
     // インベントリ
     private final ItemStackHandler inventory = new ItemStackHandler(SLOT_COUNT) {
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
+            if (slot >= INPUT_SLOT_1 && slot <= INPUT_SLOT_4) {
+                currentRecipe = null;
+            }
         }
 
         @Override
@@ -82,6 +89,7 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            currentRecipe = null;
         }
     };
 
@@ -89,6 +97,7 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            currentRecipe = null;
         }
     };
 
@@ -123,7 +132,6 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
                 case 3 -> heatStorage.getMaxHeat();
                 case 4 -> manaStorage.getManaStored();
                 case 5 -> manaStorage.getMaxManaStored();
-                // 液体タンクの量（上位/下位16ビットで分割）
                 case 6 -> inputTank1.getFluidAmount();
                 case 7 -> inputTank2.getFluidAmount();
                 case 8 -> outputTank1.getFluidAmount();
@@ -209,33 +217,64 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         return new MixerMenu(containerId, playerInventory, this, data);
     }
 
-    // ==================== 処理ロジック ====================
+    // ==================== レシピ処理 ====================
+
+    private SimpleContainer createItemContainer() {
+        SimpleContainer container = new SimpleContainer(4);
+        for (int i = 0; i < 4; i++) {
+            container.setItem(i, inventory.getStackInSlot(i));
+        }
+        return container;
+    }
+
+    private Optional<MixerRecipe> getRecipe() {
+        if (level == null) return Optional.empty();
+        
+        SimpleContainer container = createItemContainer();
+        
+        if (currentRecipe != null) {
+            if (currentRecipe.matchesWithFluids(container, inputTank1.getFluid(), inputTank2.getFluid(), level)) {
+                return Optional.of(currentRecipe);
+            }
+        }
+
+        // レシピを検索
+        Optional<MixerRecipe> recipe = level.getRecipeManager()
+                .getAllRecipesFor(ModRecipes.MIXER_TYPE.get())
+                .stream()
+                .filter(r -> r.matchesWithFluids(container, inputTank1.getFluid(), inputTank2.getFluid(), level))
+                .findFirst();
+        
+        recipe.ifPresent(r -> currentRecipe = r);
+        return recipe;
+    }
 
     @Override
     protected boolean canProcess() {
         if (!super.canProcess()) return false;
-        
-        // TODO: レシピマネージャーから有効なレシピをチェック
-        MixerRecipeResult result = getMixingResult();
-        if (result == null) return false;
+
+        Optional<MixerRecipe> recipe = getRecipe();
+        if (recipe.isEmpty()) return false;
+
+        MixerRecipe r = recipe.get();
 
         // 出力スペースチェック
-        if (!result.outputItem.isEmpty()) {
+        if (!r.getResult().isEmpty()) {
             ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
             if (!output.isEmpty()) {
-                if (!ItemStack.isSameItemSameTags(output, result.outputItem)) return false;
-                if (output.getCount() + result.outputItem.getCount() > output.getMaxStackSize()) return false;
+                if (!ItemStack.isSameItemSameTags(output, r.getResult())) return false;
+                if (output.getCount() + r.getResult().getCount() > output.getMaxStackSize()) return false;
             }
         }
 
         // 液体出力スペースチェック
-        if (!result.outputFluid1.isEmpty()) {
-            if (outputTank1.fill(result.outputFluid1, IFluidHandler.FluidAction.SIMULATE) < result.outputFluid1.getAmount()) {
+        if (!r.getFluidOutput1().isEmpty()) {
+            if (outputTank1.fill(r.getFluidOutput1(), IFluidHandler.FluidAction.SIMULATE) < r.getFluidOutput1().getAmount()) {
                 return false;
             }
         }
-        if (!result.outputFluid2.isEmpty()) {
-            if (outputTank2.fill(result.outputFluid2, IFluidHandler.FluidAction.SIMULATE) < result.outputFluid2.getAmount()) {
+        if (!r.getFluidOutput2().isEmpty()) {
+            if (outputTank2.fill(r.getFluidOutput2(), IFluidHandler.FluidAction.SIMULATE) < r.getFluidOutput2().getAmount()) {
                 return false;
             }
         }
@@ -245,15 +284,18 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
 
     @Override
     protected boolean processRecipe() {
-        MixerRecipeResult result = getMixingResult();
-        if (result == null) {
+        if (level == null) return false;
+        
+        Optional<MixerRecipe> recipeOpt = getRecipe();
+        if (recipeOpt.isEmpty()) {
             progress = 0;
             return false;
         }
 
-        // 処理時間を計算（Tierによる速度ボーナス）
+        MixerRecipe recipe = recipeOpt.get();
+
         MachineTier tier = getTier();
-        int processTime = tier.calculateProcessTime(BASE_PROCESS_TIME);
+        int processTime = tier.calculateProcessTime(recipe.getProcessingTime());
 
         if (maxProgress == 0) {
             maxProgress = processTime;
@@ -262,85 +304,64 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         progress++;
 
         if (progress >= maxProgress) {
-            // 処理完了 - 入力消費
-            for (int i = 0; i < result.inputItemCounts.length; i++) {
-                if (result.inputItemCounts[i] > 0) {
-                    inventory.extractItem(i, result.inputItemCounts[i], false);
+            // アイテム入力消費
+            for (var ingredient : recipe.getIngredientList()) {
+                for (int i = 0; i < 4; i++) {
+                    ItemStack slot = inventory.getStackInSlot(i);
+                    if (ingredient.test(slot)) {
+                        inventory.extractItem(i, 1, false);
+                        break;
+                    }
                 }
             }
-            if (result.inputFluid1Amount > 0) {
-                inputTank1.drain(result.inputFluid1Amount, IFluidHandler.FluidAction.EXECUTE);
+
+            // 液体入力消費
+            FluidStack fluidIn1 = recipe.getFluidInput1();
+            FluidStack fluidIn2 = recipe.getFluidInput2();
+            
+            if (!fluidIn1.isEmpty()) {
+                if (inputTank1.getFluid().isFluidEqual(fluidIn1)) {
+                    inputTank1.drain(fluidIn1.getAmount(), IFluidHandler.FluidAction.EXECUTE);
+                } else if (inputTank2.getFluid().isFluidEqual(fluidIn1)) {
+                    inputTank2.drain(fluidIn1.getAmount(), IFluidHandler.FluidAction.EXECUTE);
+                }
             }
-            if (result.inputFluid2Amount > 0) {
-                inputTank2.drain(result.inputFluid2Amount, IFluidHandler.FluidAction.EXECUTE);
+            if (!fluidIn2.isEmpty()) {
+                if (inputTank2.getFluid().isFluidEqual(fluidIn2)) {
+                    inputTank2.drain(fluidIn2.getAmount(), IFluidHandler.FluidAction.EXECUTE);
+                } else if (inputTank1.getFluid().isFluidEqual(fluidIn2)) {
+                    inputTank1.drain(fluidIn2.getAmount(), IFluidHandler.FluidAction.EXECUTE);
+                }
             }
 
-            // 出力
-            if (!result.outputItem.isEmpty()) {
+            // アイテム出力
+            if (!recipe.getResult().isEmpty()) {
                 ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
                 if (output.isEmpty()) {
-                    inventory.setStackInSlot(OUTPUT_SLOT, result.outputItem.copy());
+                    inventory.setStackInSlot(OUTPUT_SLOT, recipe.getResult().copy());
                 } else {
-                    output.grow(result.outputItem.getCount());
+                    output.grow(recipe.getResult().getCount());
                 }
             }
-            if (!result.outputFluid1.isEmpty()) {
-                outputTank1.fill(result.outputFluid1, IFluidHandler.FluidAction.EXECUTE);
+
+            // 液体出力
+            if (!recipe.getFluidOutput1().isEmpty()) {
+                outputTank1.fill(recipe.getFluidOutput1(), IFluidHandler.FluidAction.EXECUTE);
             }
-            if (!result.outputFluid2.isEmpty()) {
-                outputTank2.fill(result.outputFluid2, IFluidHandler.FluidAction.EXECUTE);
+            if (!recipe.getFluidOutput2().isEmpty()) {
+                outputTank2.fill(recipe.getFluidOutput2(), IFluidHandler.FluidAction.EXECUTE);
             }
 
-            // 魔力消費
             manaStorage.extractMana(getManaPerOperation(), false);
 
             progress = 0;
             maxProgress = 0;
+            currentRecipe = null;
             return true;
         }
 
         return false;
     }
-
-    /**
-     * 混合結果を取得
-     * TODO: レシピマネージャーに置き換え
-     */
-    private MixerRecipeResult getMixingResult() {
-        // 仮実装: 簡単なレシピ例
-        
-        // 水 + 溶岩 → 黒曜石
-        if (!inputTank1.isEmpty() && !inputTank2.isEmpty()) {
-            FluidStack fluid1 = inputTank1.getFluid();
-            FluidStack fluid2 = inputTank2.getFluid();
-            
-            if ((fluid1.getFluid() == Fluids.WATER && fluid2.getFluid() == Fluids.LAVA) ||
-                (fluid1.getFluid() == Fluids.LAVA && fluid2.getFluid() == Fluids.WATER)) {
-                if (fluid1.getAmount() >= 1000 && fluid2.getAmount() >= 1000) {
-                    return new MixerRecipeResult(
-                            new int[]{0, 0, 0, 0},  // アイテム消費なし
-                            1000, 1000,  // 液体消費
-                            new ItemStack(Items.OBSIDIAN),  // 出力
-                            FluidStack.EMPTY, FluidStack.EMPTY  // 液体出力なし
-                    );
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * 混合結果を保持する内部クラス
-     */
-    private record MixerRecipeResult(
-            int[] inputItemCounts,
-            int inputFluid1Amount,
-            int inputFluid2Amount,
-            ItemStack outputItem,
-            FluidStack outputFluid1,
-            FluidStack outputFluid2
-    ) {}
 
     // ==================== タンクゲッター ====================
 
@@ -397,7 +418,6 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
     @Override
     public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
         if (cap == ForgeCapabilities.FLUID_HANDLER) {
-            // 方向に応じてタンクを返す（簡易実装）
             if (side == Direction.UP) {
                 return inputFluidHandler1.cast();
             } else if (side == Direction.DOWN) {

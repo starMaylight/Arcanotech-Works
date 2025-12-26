@@ -1,0 +1,11 @@
+{
+  "type": "arcanotech_works:rolling",
+  "ingredient": {
+    "item": "minecraft:iron_ingot"
+  },
+  "result": {
+    "item": "arcanotech_works:iron_plate",
+    "count": 1
+  },
+  "processingTime": 100
+}

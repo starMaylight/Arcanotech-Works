@@ -1,0 +1,11 @@
+{
+  "type": "arcanotech_works:rolling",
+  "ingredient": {
+    "item": "minecraft:gold_ingot"
+  },
+  "result": {
+    "item": "arcanotech_works:gold_plate",
+    "count": 1
+  },
+  "processingTime": 100
+}

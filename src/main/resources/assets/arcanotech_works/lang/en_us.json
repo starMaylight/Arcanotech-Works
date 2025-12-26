@@ -134,5 +134,19 @@
   "tooltip.arcanotech_works.engraved": "Engraved",
   "tooltip.arcanotech_works.click_to_engrave": "Click to engrave",
   "message.arcanotech_works.no_molten_mithril": "* Not enough molten mithril",
-  "message.arcanotech_works.no_chisel": "* Engraving tool required"
+  "message.arcanotech_works.no_chisel": "* Engraving tool required",
+
+  "tooltip.arcanotech_works.heat": "Heat: %s / %s",
+  "tooltip.arcanotech_works.overheat_warning": "* Overheat Warning!",
+  "tooltip.arcanotech_works.cooling_fan.desc": "Accelerates cooling and prevents overheat",
+  "tooltip.arcanotech_works.cooling_core.desc": "Disables heat generation",
+  "tooltip.arcanotech_works.tank_empty": "Empty",
+  "tooltip.arcanotech_works.tank_fluid": "%s: %s / %s mb",
+
+  "jei.arcanotech_works.crushing": "Crushing",
+  "jei.arcanotech_works.compressing": "Compressing",
+  "jei.arcanotech_works.rolling": "Rolling",
+  "jei.arcanotech_works.mixing": "Mixing",
+  "jei.arcanotech_works.input_count": "Required: %s",
+  "tooltip.arcanotech_works.show_recipes": "Right-click to show recipes"
 }

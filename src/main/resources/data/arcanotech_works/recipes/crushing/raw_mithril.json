@@ -1,0 +1,11 @@
+{
+  "type": "arcanotech_works:crushing",
+  "ingredient": {
+    "item": "arcanotech_works:raw_mithril"
+  },
+  "result": {
+    "item": "arcanotech_works:mithril_dust",
+    "count": 2
+  },
+  "processingTime": 200
+}

@@ -55,6 +55,16 @@ public class ModCreativeTabs {
                         output.accept(ModItems.REFINERY_CIRCUIT.get());
                         output.accept(ModItems.SENSOR_CIRCUIT.get());
                         
+                        // 冷却アイテム
+                        output.accept(ModItems.COOLING_FAN.get());
+                        output.accept(ModItems.COOLING_CORE.get());
+                        
+                        // プレート
+                        output.accept(ModItems.IRON_PLATE.get());
+                        output.accept(ModItems.GOLD_PLATE.get());
+                        output.accept(ModItems.COPPER_PLATE.get());
+                        output.accept(ModItems.MITHRIL_PLATE.get());
+                        
                         // ブロック
                         output.accept(ModBlocks.MITHRIL_ORE.get());
                         output.accept(ModBlocks.DEEPSLATE_MITHRIL_ORE.get());
@@ -70,11 +80,24 @@ public class ModCreativeTabs {
                     .displayItems((parameters, output) -> {
                         // 魔力ネットワーク
                         output.accept(ModBlocks.MANA_CONDUIT.get());
-                        // 機械
+                        
+                        // 魔力機械
                         output.accept(ModBlocks.MANA_GENERATOR.get());
                         output.accept(ModBlocks.MANA_REFINERY.get());
                         output.accept(ModBlocks.MANA_COLLECTOR.get());
                         output.accept(ModBlocks.ENGRAVING_TABLE.get());
+                        
+                        // 機械筐体
+                        output.accept(ModBlocks.MACHINE_FRAME_BASIC.get());
+                        output.accept(ModBlocks.MACHINE_FRAME_ADVANCED.get());
+                        output.accept(ModBlocks.MACHINE_FRAME_ELITE.get());
+                        output.accept(ModBlocks.MACHINE_FRAME_ULTIMATE.get());
+                        
+                        // 工業機械
+                        output.accept(ModBlocks.CRUSHER.get());
+                        output.accept(ModBlocks.COMPRESSOR.get());
+                        output.accept(ModBlocks.ROLLING_MILL.get());
+                        output.accept(ModBlocks.MIXER.get());
                     }).build());
 
     public static final RegistryObject<CreativeModeTab> CONCEPTS_TAB = CREATIVE_MODE_TABS.register("concepts_tab",

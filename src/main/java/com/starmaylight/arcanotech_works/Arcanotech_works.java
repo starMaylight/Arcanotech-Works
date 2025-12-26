@@ -16,6 +16,7 @@ import com.starmaylight.arcanotech_works.client.screen.ManaGeneratorScreen;
 import com.starmaylight.arcanotech_works.client.screen.ManaRefineryScreen;
 import com.starmaylight.arcanotech_works.loot.ModLootFunctions;
 import com.starmaylight.arcanotech_works.network.ModNetwork;
+import com.starmaylight.arcanotech_works.recipe.ModRecipes;
 import com.starmaylight.arcanotech_works.registry.ModBlocks;
 import com.starmaylight.arcanotech_works.registry.ModCreativeTabs;
 import com.starmaylight.arcanotech_works.registry.ModItems;
@@ -55,6 +56,7 @@ public class Arcanotech_works {
         ModMenuTypes.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
         ModLootFunctions.register(modEventBus);
+        ModRecipes.register(modEventBus);
 
         // ライフサイクルイベント
         modEventBus.addListener(this::commonSetup);

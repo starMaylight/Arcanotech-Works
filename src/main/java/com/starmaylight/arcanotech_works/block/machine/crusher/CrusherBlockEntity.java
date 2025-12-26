@@ -3,6 +3,8 @@ package com.starmaylight.arcanotech_works.block.machine.crusher;
 import com.starmaylight.arcanotech_works.block.machine.AbstractMachineBlockEntity;
 import com.starmaylight.arcanotech_works.block.machine.MachineTier;
 import com.starmaylight.arcanotech_works.blockentity.ModBlockEntities;
+import com.starmaylight.arcanotech_works.recipe.CrusherRecipe;
+import com.starmaylight.arcanotech_works.recipe.ModRecipes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
@@ -15,6 +17,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Optional;
 
 /**
  * 粉砕機のBlockEntity
@@ -32,23 +36,28 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
     public static final int SLOT_COUNT = 3;
 
     // 処理パラメータ
-    private static final int BASE_PROCESS_TIME = 200;  // 10秒
     private static final int MANA_CAPACITY = 10000;
     private static final int MANA_MAX_INPUT = 100;
     private static final int MANA_PER_OPERATION = 50;
     private static final int HEAT_PER_OPERATION = 10;
+
+    // 現在のレシピキャッシュ
+    private CrusherRecipe currentRecipe = null;
 
     // インベントリ
     private final ItemStackHandler inventory = new ItemStackHandler(SLOT_COUNT) {
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
+            if (slot == INPUT_SLOT) {
+                currentRecipe = null;  // 入力変更時にレシピキャッシュをクリア
+            }
         }
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
             return switch (slot) {
-                case INPUT_SLOT -> true;  // TODO: レシピで有効な入力かチェック
+                case INPUT_SLOT -> true;
                 case OUTPUT_SLOT -> false;
                 case COOLING_SLOT -> isFan(stack) || isCoolingCore(stack);
                 default -> false;
@@ -114,7 +123,7 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
     @Override
     protected int getCoolingCoreSlotIndex() {
-        return COOLING_SLOT;  // 同じスロットを共用
+        return COOLING_SLOT;
     }
 
     @Override
@@ -148,7 +157,31 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
         return new CrusherMenu(containerId, playerInventory, this, data);
     }
 
-    // ==================== 処理ロジック ====================
+    // ==================== レシピ処理 ====================
+
+    /**
+     * 現在の入力に対するレシピを取得
+     */
+    private Optional<CrusherRecipe> getRecipe() {
+        if (level == null) return Optional.empty();
+        
+        if (currentRecipe != null) {
+            SimpleContainer container = new SimpleContainer(1);
+            container.setItem(0, inventory.getStackInSlot(INPUT_SLOT));
+            if (currentRecipe.matches(container, level)) {
+                return Optional.of(currentRecipe);
+            }
+        }
+
+        SimpleContainer container = new SimpleContainer(1);
+        container.setItem(0, inventory.getStackInSlot(INPUT_SLOT));
+        
+        Optional<CrusherRecipe> recipe = level.getRecipeManager()
+                .getRecipeFor(ModRecipes.CRUSHER_TYPE.get(), container, level);
+        
+        recipe.ifPresent(r -> currentRecipe = r);
+        return recipe;
+    }
 
     @Override
     protected boolean canProcess() {
@@ -157,11 +190,12 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
         ItemStack input = inventory.getStackInSlot(INPUT_SLOT);
         if (input.isEmpty()) return false;
 
-        // TODO: レシピマネージャーから出力を取得
-        ItemStack result = getCrushingResult(input);
-        if (result.isEmpty()) return false;
+        Optional<CrusherRecipe> recipe = getRecipe();
+        if (recipe.isEmpty()) return false;
 
+        ItemStack result = recipe.get().getResult();
         ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
+        
         if (output.isEmpty()) return true;
         if (!ItemStack.isSameItemSameTags(output, result)) return false;
         return output.getCount() + result.getCount() <= output.getMaxStackSize();
@@ -169,21 +203,19 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
     @Override
     protected boolean processRecipe() {
-        ItemStack input = inventory.getStackInSlot(INPUT_SLOT);
-        if (input.isEmpty()) {
+        if (level == null) return false;
+        
+        Optional<CrusherRecipe> recipeOpt = getRecipe();
+        if (recipeOpt.isEmpty()) {
             progress = 0;
             return false;
         }
 
-        ItemStack result = getCrushingResult(input);
-        if (result.isEmpty()) {
-            progress = 0;
-            return false;
-        }
+        CrusherRecipe recipe = recipeOpt.get();
 
-        // 処理時間を計算（Tierによる速度ボーナス）
+        // 処理時間を計算（レシピの処理時間 × Tierボーナス）
         MachineTier tier = getTier();
-        int processTime = tier.calculateProcessTime(BASE_PROCESS_TIME);
+        int processTime = tier.calculateProcessTime(recipe.getProcessingTime());
 
         if (maxProgress == 0) {
             maxProgress = processTime;
@@ -193,9 +225,11 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
         if (progress >= maxProgress) {
             // 処理完了
-            input.shrink(1);
+            inventory.extractItem(INPUT_SLOT, 1, false);
             
+            ItemStack result = recipe.getResult();
             ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
+            
             if (output.isEmpty()) {
                 inventory.setStackInSlot(OUTPUT_SLOT, result.copy());
             } else {
@@ -207,31 +241,11 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
             progress = 0;
             maxProgress = 0;
+            currentRecipe = null;
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * 粉砕結果を取得
-     * TODO: レシピマネージャーに置き換え
-     */
-    private ItemStack getCrushingResult(ItemStack input) {
-        // 仮実装: 鉱石タグをチェックして粉を2つ出力
-        // 将来的にはレシピシステムで管理
-        
-        // 鉄鉱石 → 鉄の粉×2（仮）
-        if (input.is(net.minecraft.world.item.Items.RAW_IRON)) {
-            return new ItemStack(com.starmaylight.arcanotech_works.registry.ModItems.MITHRIL_DUST.get(), 2);
-        }
-        
-        // 魔導銀原石 → 魔導銀粉×2
-        if (input.is(com.starmaylight.arcanotech_works.registry.ModItems.RAW_MITHRIL.get())) {
-            return new ItemStack(com.starmaylight.arcanotech_works.registry.ModItems.MITHRIL_DUST.get(), 2);
-        }
-
-        return ItemStack.EMPTY;
     }
 
     // ==================== ゲッター ====================

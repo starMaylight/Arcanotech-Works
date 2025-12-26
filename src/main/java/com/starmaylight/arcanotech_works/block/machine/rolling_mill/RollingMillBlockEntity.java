@@ -3,7 +3,8 @@ package com.starmaylight.arcanotech_works.block.machine.rolling_mill;
 import com.starmaylight.arcanotech_works.block.machine.AbstractMachineBlockEntity;
 import com.starmaylight.arcanotech_works.block.machine.MachineTier;
 import com.starmaylight.arcanotech_works.blockentity.ModBlockEntities;
-import com.starmaylight.arcanotech_works.registry.ModItems;
+import com.starmaylight.arcanotech_works.recipe.ModRecipes;
+import com.starmaylight.arcanotech_works.recipe.RollingMillRecipe;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
@@ -13,16 +14,17 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Optional;
+
 /**
  * 圧延機のBlockEntity
  * インベントリ構成:
- * - スロット0: 入力（インゴット）
- * - スロット1: 出力（プレート）
+ * - スロット0: 入力
+ * - スロット1: 出力
  * - スロット2: ファン/冷却コアスロット
  */
 public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
@@ -34,23 +36,28 @@ public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
     public static final int SLOT_COUNT = 3;
 
     // 処理パラメータ
-    private static final int BASE_PROCESS_TIME = 100;  // 5秒
     private static final int MANA_CAPACITY = 10000;
     private static final int MANA_MAX_INPUT = 100;
     private static final int MANA_PER_OPERATION = 30;
     private static final int HEAT_PER_OPERATION = 12;
+
+    // 現在のレシピキャッシュ
+    private RollingMillRecipe currentRecipe = null;
 
     // インベントリ
     private final ItemStackHandler inventory = new ItemStackHandler(SLOT_COUNT) {
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
+            if (slot == INPUT_SLOT) {
+                currentRecipe = null;
+            }
         }
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
             return switch (slot) {
-                case INPUT_SLOT -> true;  // TODO: レシピで有効な入力かチェック
+                case INPUT_SLOT -> true;
                 case OUTPUT_SLOT -> false;
                 case COOLING_SLOT -> isFan(stack) || isCoolingCore(stack);
                 default -> false;
@@ -150,7 +157,28 @@ public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
         return new RollingMillMenu(containerId, playerInventory, this, data);
     }
 
-    // ==================== 処理ロジック ====================
+    // ==================== レシピ処理 ====================
+
+    private Optional<RollingMillRecipe> getRecipe() {
+        if (level == null) return Optional.empty();
+        
+        if (currentRecipe != null) {
+            SimpleContainer container = new SimpleContainer(1);
+            container.setItem(0, inventory.getStackInSlot(INPUT_SLOT));
+            if (currentRecipe.matches(container, level)) {
+                return Optional.of(currentRecipe);
+            }
+        }
+
+        SimpleContainer container = new SimpleContainer(1);
+        container.setItem(0, inventory.getStackInSlot(INPUT_SLOT));
+        
+        Optional<RollingMillRecipe> recipe = level.getRecipeManager()
+                .getRecipeFor(ModRecipes.ROLLING_MILL_TYPE.get(), container, level);
+        
+        recipe.ifPresent(r -> currentRecipe = r);
+        return recipe;
+    }
 
     @Override
     protected boolean canProcess() {
@@ -159,11 +187,12 @@ public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
         ItemStack input = inventory.getStackInSlot(INPUT_SLOT);
         if (input.isEmpty()) return false;
 
-        // TODO: レシピマネージャーから出力を取得
-        ItemStack result = getRollingResult(input);
-        if (result.isEmpty()) return false;
+        Optional<RollingMillRecipe> recipe = getRecipe();
+        if (recipe.isEmpty()) return false;
 
+        ItemStack result = recipe.get().getResult();
         ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
+        
         if (output.isEmpty()) return true;
         if (!ItemStack.isSameItemSameTags(output, result)) return false;
         return output.getCount() + result.getCount() <= output.getMaxStackSize();
@@ -171,21 +200,18 @@ public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
 
     @Override
     protected boolean processRecipe() {
-        ItemStack input = inventory.getStackInSlot(INPUT_SLOT);
-        if (input.isEmpty()) {
+        if (level == null) return false;
+        
+        Optional<RollingMillRecipe> recipeOpt = getRecipe();
+        if (recipeOpt.isEmpty()) {
             progress = 0;
             return false;
         }
 
-        ItemStack result = getRollingResult(input);
-        if (result.isEmpty()) {
-            progress = 0;
-            return false;
-        }
+        RollingMillRecipe recipe = recipeOpt.get();
 
-        // 処理時間を計算（Tierによる速度ボーナス）
         MachineTier tier = getTier();
-        int processTime = tier.calculateProcessTime(BASE_PROCESS_TIME);
+        int processTime = tier.calculateProcessTime(recipe.getProcessingTime());
 
         if (maxProgress == 0) {
             maxProgress = processTime;
@@ -194,55 +220,26 @@ public class RollingMillBlockEntity extends AbstractMachineBlockEntity {
         progress++;
 
         if (progress >= maxProgress) {
-            // 処理完了
-            input.shrink(1);
+            inventory.extractItem(INPUT_SLOT, 1, false);
             
+            ItemStack result = recipe.getResult();
             ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
+            
             if (output.isEmpty()) {
                 inventory.setStackInSlot(OUTPUT_SLOT, result.copy());
             } else {
                 output.grow(result.getCount());
             }
 
-            // 魔力消費
             manaStorage.extractMana(getManaPerOperation(), false);
 
             progress = 0;
             maxProgress = 0;
+            currentRecipe = null;
             return true;
         }
 
         return false;
-    }
-
-    /**
-     * 圧延結果を取得
-     * TODO: レシピマネージャーに置き換え
-     */
-    private ItemStack getRollingResult(ItemStack input) {
-        // 仮実装: インゴット→プレート
-        
-        // 鉄インゴット → 鉄プレート
-        if (input.is(Items.IRON_INGOT)) {
-            return new ItemStack(ModItems.IRON_PLATE.get());
-        }
-        
-        // 金インゴット → 金プレート
-        if (input.is(Items.GOLD_INGOT)) {
-            return new ItemStack(ModItems.GOLD_PLATE.get());
-        }
-        
-        // 銅インゴット → 銅プレート
-        if (input.is(Items.COPPER_INGOT)) {
-            return new ItemStack(ModItems.COPPER_PLATE.get());
-        }
-        
-        // 魔導銀インゴット → 魔導銀プレート
-        if (input.is(ModItems.MITHRIL_INGOT.get())) {
-            return new ItemStack(ModItems.MITHRIL_PLATE.get());
-        }
-
-        return ItemStack.EMPTY;
     }
 
     // ==================== ゲッター ====================

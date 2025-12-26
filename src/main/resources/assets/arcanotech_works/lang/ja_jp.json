@@ -135,5 +135,12 @@
   "tooltip.arcanotech_works.cooling_fan.desc": "機械の冷却を促進し、オーバーヒートを回避",
   "tooltip.arcanotech_works.cooling_core.desc": "機械の熱発生を無効化",
   "tooltip.arcanotech_works.tank_empty": "空",
-  "tooltip.arcanotech_works.tank_fluid": "%s: %s / %s mb"
+  "tooltip.arcanotech_works.tank_fluid": "%s: %s / %s mb",
+
+  "jei.arcanotech_works.crushing": "粉砕",
+  "jei.arcanotech_works.compressing": "圧縮",
+  "jei.arcanotech_works.rolling": "圧延",
+  "jei.arcanotech_works.mixing": "混合",
+  "jei.arcanotech_works.input_count": "必要個数: %s",
+  "tooltip.arcanotech_works.show_recipes": "右クリックでレシピを表示"
 }

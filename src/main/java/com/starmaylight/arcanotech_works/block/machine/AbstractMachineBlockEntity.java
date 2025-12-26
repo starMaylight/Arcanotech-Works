@@ -11,9 +11,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
-import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -21,7 +19,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,11 +40,16 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
     protected static final int FAN_SLOT = -1;  // サブクラスで上書き
 
     // ファンによる追加冷却
-    protected static final int FAN_COOLING_BONUS = 2;
+    protected static final int FAN_COOLING_BONUS = 1;  // 1 heat/sec追加
 
     // 処理関連
     protected int progress = 0;
     protected int maxProgress = 0;
+
+    // 熱冷却遅延（処理完了後10秒 = 200tick）
+    protected static final int COOLING_DELAY_TICKS = 200;
+    protected int coolingDelayTimer = 0;  // 冷却開始までのタイマー
+    protected int coolingTickCounter = 0;  // 1秒カウント用（20tickで1回冷却）
 
     public AbstractMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -150,6 +152,7 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
         boolean wasActive = isActive();
         boolean didWork = false;
+        boolean isProcessing = false;
 
         // 冷却コアがある場合は熱発生なし
         boolean hasCoolingCore = hasCoolingCore();
@@ -157,15 +160,22 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
         // レシピ処理
         if (canProcess()) {
             didWork = processRecipe();
+            isProcessing = progress > 0;  // 処理中かどうか
             
-            // 熱発生（冷却コアがない場合のみ）
+            // 熱発生（冷却コアがない場合のみ、処理完了時）
             if (didWork && !hasCoolingCore) {
                 heatStorage.addHeat(getHeatPerOperation());
             }
         }
 
-        // 自然冷却
-        applyCooling();
+        // 冷却処理（処理中は冷却しない）
+        if (isProcessing) {
+            // 処理中は冷却遅延タイマーをリセット
+            coolingDelayTimer = COOLING_DELAY_TICKS;
+        } else {
+            // 処理していない場合は冷却を試みる
+            applyCooling();
+        }
 
         // オーバーヒートチェック
         if (heatStorage.isOverheated()) {
@@ -186,17 +196,38 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
     /**
      * 冷却処理
+     * - 処理終了後10秒（200tick）経過してから冷却開始
+     * - 冷却速度は1heat/sec（20tickに1回）
+     * - ファンがある場合は追加で1heat/sec
      */
     protected void applyCooling() {
-        MachineTier tier = getTier();
-        int cooling = tier.getNaturalCooling();
-
-        // ファンボーナス
-        if (hasFan()) {
-            cooling += FAN_COOLING_BONUS;
+        // 冷却遅延タイマーがある場合はカウントダウン
+        if (coolingDelayTimer > 0) {
+            coolingDelayTimer--;
+            return;
         }
 
-        heatStorage.removeHeat(cooling);
+        // 熱がない場合は何もしない
+        if (heatStorage.getHeat() <= 0) {
+            return;
+        }
+
+        // 1秒（20tick）に1回冷却
+        coolingTickCounter++;
+        if (coolingTickCounter >= 20) {
+            coolingTickCounter = 0;
+            
+            // 基本冷却: 1 heat/sec
+            int cooling = 1;
+            
+            // ファンボーナス: +1 heat/sec
+            if (hasFan()) {
+                cooling += FAN_COOLING_BONUS;
+            }
+            
+            heatStorage.removeHeat(cooling);
+            setChanged();
+        }
     }
 
     /**
@@ -329,6 +360,8 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
         tag.put("Inventory", getInventory().serializeNBT());
         tag.putInt("Progress", progress);
         tag.putInt("MaxProgress", maxProgress);
+        tag.putInt("CoolingDelayTimer", coolingDelayTimer);
+        tag.putInt("CoolingTickCounter", coolingTickCounter);
     }
 
     @Override
@@ -345,6 +378,8 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
         }
         progress = tag.getInt("Progress");
         maxProgress = tag.getInt("MaxProgress");
+        coolingDelayTimer = tag.getInt("CoolingDelayTimer");
+        coolingTickCounter = tag.getInt("CoolingTickCounter");
     }
 
     // ==================== Capability ====================

@@ -3,6 +3,7 @@ package com.starmaylight.arcanotech_works.client.screen;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.starmaylight.arcanotech_works.Arcanotech_works;
 import com.starmaylight.arcanotech_works.block.machine.rolling_mill.RollingMillMenu;
+import com.starmaylight.arcanotech_works.compat.jei.JEIHelper;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -125,5 +126,22 @@ public class RollingMillScreen extends AbstractContainerScreen<RollingMillMenu> 
                             menu.getMana(), menu.getMaxMana()),
                     mouseX, mouseY);
         }
+
+        // 進捗バーのツールチップ（JEIへのリンク提示）
+        if (isHovering(PROGRESS_X, PROGRESS_Y, PROGRESS_WIDTH, PROGRESS_HEIGHT, mouseX, mouseY)) {
+            guiGraphics.renderTooltip(this.font,
+                    Component.translatable("tooltip.arcanotech_works.show_recipes"),
+                    mouseX, mouseY);
+        }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 右クリックで進捗バーをクリックした場合、JEIレシピを表示
+        if (button == 1 && isHovering(PROGRESS_X, PROGRESS_Y, PROGRESS_WIDTH, PROGRESS_HEIGHT, mouseX, mouseY)) {
+            JEIHelper.showRollingMillRecipes();
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 }

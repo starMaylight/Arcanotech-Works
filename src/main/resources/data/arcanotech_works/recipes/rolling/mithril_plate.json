@@ -1,0 +1,11 @@
+{
+  "type": "arcanotech_works:rolling",
+  "ingredient": {
+    "item": "arcanotech_works:mithril_ingot"
+  },
+  "result": {
+    "item": "arcanotech_works:mithril_plate",
+    "count": 1
+  },
+  "processingTime": 100
+}

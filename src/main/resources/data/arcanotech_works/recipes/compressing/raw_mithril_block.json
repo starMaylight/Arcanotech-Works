@@ -1,0 +1,12 @@
+{
+  "type": "arcanotech_works:compressing",
+  "ingredient": {
+    "item": "arcanotech_works:raw_mithril"
+  },
+  "inputCount": 9,
+  "result": {
+    "item": "arcanotech_works:raw_mithril_block",
+    "count": 1
+  },
+  "processingTime": 160
+}
