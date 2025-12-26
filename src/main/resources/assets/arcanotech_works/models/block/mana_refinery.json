@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "arcanotech_works:block/mana_refinery_top",
+    "front": "arcanotech_works:block/mana_refinery_front",
+    "side": "arcanotech_works:block/mana_refinery_side"
+  }
+}

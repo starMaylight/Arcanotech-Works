@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "arcanotech_works:mithril_ore",
+    "arcanotech_works:deepslate_mithril_ore",
+    "arcanotech_works:mana_crystal_ore",
+    "arcanotech_works:mithril_block",
+    "arcanotech_works:raw_mithril_block"
+  ]
+}

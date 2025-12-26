@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "active=false,facing=north": { "model": "arcanotech_works:block/mana_refinery" },
+    "active=false,facing=east": { "model": "arcanotech_works:block/mana_refinery", "y": 90 },
+    "active=false,facing=south": { "model": "arcanotech_works:block/mana_refinery", "y": 180 },
+    "active=false,facing=west": { "model": "arcanotech_works:block/mana_refinery", "y": 270 },
+    "active=true,facing=north": { "model": "arcanotech_works:block/mana_refinery_on" },
+    "active=true,facing=east": { "model": "arcanotech_works:block/mana_refinery_on", "y": 90 },
+    "active=true,facing=south": { "model": "arcanotech_works:block/mana_refinery_on", "y": 180 },
+    "active=true,facing=west": { "model": "arcanotech_works:block/mana_refinery_on", "y": 270 }
+  }
+}

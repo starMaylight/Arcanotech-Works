@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "arcanotech_works:block/rolling_mill_top",
+    "front": "arcanotech_works:block/rolling_mill_front_on",
+    "side": "arcanotech_works:block/rolling_mill_side"
+  }
+}

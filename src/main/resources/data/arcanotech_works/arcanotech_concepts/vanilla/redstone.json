@@ -1,0 +1,8 @@
+{
+  "item": "minecraft:redstone",
+  "inherited": true,
+  "concepts": [
+    { "type": "breath", "intensity": 75 },
+    { "type": "boundary_ring", "intensity": 60 }
+  ]
+}

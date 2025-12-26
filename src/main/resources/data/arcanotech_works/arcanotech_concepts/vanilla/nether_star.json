@@ -1,0 +1,9 @@
+{
+  "item": "minecraft:nether_star",
+  "inherited": true,
+  "concepts": [
+    { "type": "syzygy", "intensity": 100 },
+    { "type": "star_ring", "intensity": 90 },
+    { "type": "abyss", "intensity": 70 }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "replace": false,
+  "values": [
+    "arcanotech_works:mithril_ore",
+    "arcanotech_works:deepslate_mithril_ore",
+    "arcanotech_works:mana_crystal_ore",
+    "arcanotech_works:mithril_block",
+    "arcanotech_works:raw_mithril_block",
+    "arcanotech_works:mana_conduit",
+    "arcanotech_works:mana_generator",
+    "arcanotech_works:mana_refinery",
+    "arcanotech_works:mana_collector",
+    "arcanotech_works:machine_frame_basic",
+    "arcanotech_works:machine_frame_advanced",
+    "arcanotech_works:machine_frame_elite",
+    "arcanotech_works:machine_frame_ultimate",
+    "arcanotech_works:crusher",
+    "arcanotech_works:compressor",
+    "arcanotech_works:rolling_mill",
+    "arcanotech_works:mixer"
+  ]
+}

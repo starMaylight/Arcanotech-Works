@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "active=false": { "model": "arcanotech_works:block/mana_collector" },
+    "active=true": { "model": "arcanotech_works:block/mana_collector_active" }
+  }
+}

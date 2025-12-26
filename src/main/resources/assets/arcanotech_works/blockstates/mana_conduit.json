@@ -1,0 +1,31 @@
+{
+  "multipart": [
+    {
+      "apply": { "model": "arcanotech_works:block/mana_conduit_core" }
+    },
+    {
+      "when": { "north": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "y": 0 }
+    },
+    {
+      "when": { "south": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "y": 180 }
+    },
+    {
+      "when": { "east": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "y": 90 }
+    },
+    {
+      "when": { "west": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "y": 270 }
+    },
+    {
+      "when": { "up": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "x": 270 }
+    },
+    {
+      "when": { "down": "true" },
+      "apply": { "model": "arcanotech_works:block/mana_conduit_side", "x": 90 }
+    }
+  ]
+}

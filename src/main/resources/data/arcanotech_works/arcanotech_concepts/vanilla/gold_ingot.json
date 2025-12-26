@@ -1,0 +1,8 @@
+{
+  "item": "minecraft:gold_ingot",
+  "inherited": true,
+  "concepts": [
+    { "type": "exalt", "intensity": 70 },
+    { "type": "resonance", "intensity": 55 }
+  ]
+}

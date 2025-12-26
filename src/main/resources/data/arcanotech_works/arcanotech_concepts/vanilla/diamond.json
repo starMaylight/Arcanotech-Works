@@ -1,0 +1,8 @@
+{
+  "item": "minecraft:diamond",
+  "inherited": true,
+  "concepts": [
+    { "type": "stillness", "intensity": 85 },
+    { "type": "star_ring", "intensity": 70 }
+  ]
+}

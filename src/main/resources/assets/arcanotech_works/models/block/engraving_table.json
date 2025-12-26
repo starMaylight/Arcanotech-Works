@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "arcanotech_works:block/engraving_table_side",
+    "down": "arcanotech_works:block/engraving_table_bottom",
+    "up": "arcanotech_works:block/engraving_table_top",
+    "north": "arcanotech_works:block/engraving_table_side",
+    "south": "arcanotech_works:block/engraving_table_side",
+    "east": "arcanotech_works:block/engraving_table_side",
+    "west": "arcanotech_works:block/engraving_table_side"
+  }
+}

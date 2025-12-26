@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "arcanotech_works:block/mana_generator_top",
+    "front": "arcanotech_works:block/mana_generator_front_on",
+    "side": "arcanotech_works:block/mana_generator_side"
+  }
+}
