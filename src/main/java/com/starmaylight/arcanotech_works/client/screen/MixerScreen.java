@@ -16,17 +16,29 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidStack;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 混合機のGUI画面
+ * 
+ * レイアウト（JEIと統一）:
+ * [マナ][入力1][入力2][液入1]    ⟶    [液出1][出力][熱]
+ *       [入力3][入力4][液入2]         [液出2]
+ * [冷却]
  */
 public class MixerScreen extends AbstractContainerScreen<MixerMenu> {
 
     private static final ResourceLocation TEXTURE =
             new ResourceLocation(Arcanotech_works.MODID, "textures/gui/mixer.png");
 
-    // 進捗バーの位置とサイズ
-    private static final int PROGRESS_X = 84;
-    private static final int PROGRESS_Y = 35;
+    // JEIレイアウト中央配置オフセット
+    private static final int LAYOUT_OFFSET_X = 27;
+    private static final int LAYOUT_OFFSET_Y = 17;
+
+    // 進捗バーの位置とサイズ（JEI座標 + オフセット）
+    private static final int PROGRESS_X = LAYOUT_OFFSET_X + 58;   // 85
+    private static final int PROGRESS_Y = LAYOUT_OFFSET_Y + 9;    // 26
     private static final int PROGRESS_WIDTH = 24;
     private static final int PROGRESS_HEIGHT = 17;
     private static final int PROGRESS_U = 176;
@@ -48,20 +60,20 @@ public class MixerScreen extends AbstractContainerScreen<MixerMenu> {
     private static final int MANA_U = 192;
     private static final int MANA_V = 17;
 
-    // 液体タンクスロット（18x18の正方形）
+    // 液体タンクスロット（18x18の正方形）- JEI座標 + オフセット
     private static final int FLUID_SLOT_SIZE = 18;
 
-    // 入力タンク（左側、2x2グリッドの左）
-    private static final int INPUT_TANK1_X = 26;
-    private static final int INPUT_TANK1_Y = 17;
-    private static final int INPUT_TANK2_X = 26;
-    private static final int INPUT_TANK2_Y = 35;
+    // 入力タンク位置
+    private static final int INPUT_TANK1_X = LAYOUT_OFFSET_X + 37;   // 64
+    private static final int INPUT_TANK1_Y = LAYOUT_OFFSET_Y + 0;    // 17
+    private static final int INPUT_TANK2_X = LAYOUT_OFFSET_X + 37;   // 64
+    private static final int INPUT_TANK2_Y = LAYOUT_OFFSET_Y + 18;   // 35
 
-    // 出力タンク（右側、出力スロットの横）
-    private static final int OUTPUT_TANK1_X = 116;
-    private static final int OUTPUT_TANK1_Y = 17;
-    private static final int OUTPUT_TANK2_X = 116;
-    private static final int OUTPUT_TANK2_Y = 35;
+    // 出力タンク位置
+    private static final int OUTPUT_TANK1_X = LAYOUT_OFFSET_X + 85;  // 112
+    private static final int OUTPUT_TANK1_Y = LAYOUT_OFFSET_Y + 0;   // 17
+    private static final int OUTPUT_TANK2_X = LAYOUT_OFFSET_X + 85;  // 112
+    private static final int OUTPUT_TANK2_Y = LAYOUT_OFFSET_Y + 18;  // 35
 
     public MixerScreen(MixerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -95,7 +107,7 @@ public class MixerScreen extends AbstractContainerScreen<MixerMenu> {
         // マナゲージ
         renderManaGauge(guiGraphics, x, y);
 
-        // 液体タンクスロット（スロット枠を描画）
+        // 液体タンクスロット
         renderFluidSlot(guiGraphics, x + INPUT_TANK1_X, y + INPUT_TANK1_Y, menu.getInputFluid1());
         renderFluidSlot(guiGraphics, x + INPUT_TANK2_X, y + INPUT_TANK2_Y, menu.getInputFluid2());
         renderFluidSlot(guiGraphics, x + OUTPUT_TANK1_X, y + OUTPUT_TANK1_Y, menu.getOutputFluid1());
@@ -191,22 +203,26 @@ public class MixerScreen extends AbstractContainerScreen<MixerMenu> {
 
         // 入力タンク1のツールチップ
         if (isHovering(INPUT_TANK1_X, INPUT_TANK1_Y, FLUID_SLOT_SIZE, FLUID_SLOT_SIZE, mouseX, mouseY)) {
-            renderFluidTooltip(guiGraphics, menu.getInputFluid1(), menu.getInputTank1Amount(), mouseX, mouseY);
+            renderFluidTooltip(guiGraphics, menu.getInputFluid1(), menu.getInputTank1Amount(), 
+                    Component.translatable("tooltip.arcanotech_works.input_tank", 1), mouseX, mouseY);
         }
 
         // 入力タンク2のツールチップ
         if (isHovering(INPUT_TANK2_X, INPUT_TANK2_Y, FLUID_SLOT_SIZE, FLUID_SLOT_SIZE, mouseX, mouseY)) {
-            renderFluidTooltip(guiGraphics, menu.getInputFluid2(), menu.getInputTank2Amount(), mouseX, mouseY);
+            renderFluidTooltip(guiGraphics, menu.getInputFluid2(), menu.getInputTank2Amount(),
+                    Component.translatable("tooltip.arcanotech_works.input_tank", 2), mouseX, mouseY);
         }
 
         // 出力タンク1のツールチップ
         if (isHovering(OUTPUT_TANK1_X, OUTPUT_TANK1_Y, FLUID_SLOT_SIZE, FLUID_SLOT_SIZE, mouseX, mouseY)) {
-            renderFluidTooltip(guiGraphics, menu.getOutputFluid1(), menu.getOutputTank1Amount(), mouseX, mouseY);
+            renderFluidTooltip(guiGraphics, menu.getOutputFluid1(), menu.getOutputTank1Amount(),
+                    Component.translatable("tooltip.arcanotech_works.output_tank", 1), mouseX, mouseY);
         }
 
         // 出力タンク2のツールチップ
         if (isHovering(OUTPUT_TANK2_X, OUTPUT_TANK2_Y, FLUID_SLOT_SIZE, FLUID_SLOT_SIZE, mouseX, mouseY)) {
-            renderFluidTooltip(guiGraphics, menu.getOutputFluid2(), menu.getOutputTank2Amount(), mouseX, mouseY);
+            renderFluidTooltip(guiGraphics, menu.getOutputFluid2(), menu.getOutputTank2Amount(),
+                    Component.translatable("tooltip.arcanotech_works.output_tank", 2), mouseX, mouseY);
         }
 
         // 進捗バーのツールチップ（JEIへのリンク提示）
@@ -217,18 +233,19 @@ public class MixerScreen extends AbstractContainerScreen<MixerMenu> {
         }
     }
 
-    private void renderFluidTooltip(GuiGraphics guiGraphics, FluidStack fluidStack, int amount, int mouseX, int mouseY) {
+    private void renderFluidTooltip(GuiGraphics guiGraphics, FluidStack fluidStack, int amount, 
+                                     Component tankName, int mouseX, int mouseY) {
+        List<Component> tooltip = new ArrayList<>();
+        tooltip.add(tankName);
+        
         if (fluidStack.isEmpty()) {
-            guiGraphics.renderTooltip(this.font,
-                    Component.translatable("tooltip.arcanotech_works.tank_empty"),
-                    mouseX, mouseY);
+            tooltip.add(Component.translatable("tooltip.arcanotech_works.tank_empty"));
         } else {
-            guiGraphics.renderTooltip(this.font,
-                    Component.translatable("tooltip.arcanotech_works.tank_fluid",
-                            fluidStack.getDisplayName(),
-                            amount, MixerBlockEntity.TANK_CAPACITY),
-                    mouseX, mouseY);
+            tooltip.add(fluidStack.getDisplayName());
+            tooltip.add(Component.literal(amount + " / " + MixerBlockEntity.TANK_CAPACITY + " mB"));
         }
+        
+        guiGraphics.renderComponentTooltip(this.font, tooltip, mouseX, mouseY);
     }
 
     @Override

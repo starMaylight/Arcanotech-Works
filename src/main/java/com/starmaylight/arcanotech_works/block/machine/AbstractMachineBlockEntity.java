@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -48,8 +49,14 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
     // 熱冷却遅延（処理完了後10秒 = 200tick）
     protected static final int COOLING_DELAY_TICKS = 200;
-    protected int coolingDelayTimer = 0;  // 冷却開始までのタイマー
-    protected int coolingTickCounter = 0;  // 1秒カウント用（20tickで1回冷却）
+    protected int coolingDelayTimer = 0;
+    protected int coolingTickCounter = 0;
+
+    // 方向ベースのアイテムハンドラー
+    private LazyOptional<IItemHandler> topItemHandler = LazyOptional.empty();
+    private LazyOptional<IItemHandler> bottomItemHandler = LazyOptional.empty();
+    private LazyOptional<IItemHandler> sideItemHandler = LazyOptional.empty();
+    private LazyOptional<IItemHandler> directItemHandler = LazyOptional.empty();  // GUI用（全スロット）
 
     public AbstractMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -58,6 +65,37 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
         this.heatStorage = new HeatStorage(tier.getMaxHeat());
         this.manaStorage = new ManaStorage(getManaCapacity(), getManaMaxInput(), 0);
         this.manaHandler = LazyOptional.of(() -> manaStorage);
+    }
+
+    /**
+     * 方向ベースのアイテムハンドラーを初期化（サブクラスで必要に応じて呼び出し）
+     */
+    protected void initSidedHandlers() {
+        ItemStackHandler inv = getInventory();
+        
+        // 上方向: 入力スロットのみ（挿入のみ）
+        int[] inputSlots = getInputSlots();
+        if (inputSlots.length > 0) {
+            topItemHandler = LazyOptional.of(() -> 
+                SidedItemHandler.createInputHandler(inv, inputSlots));
+        }
+        
+        // 下方向: 出力スロットのみ（抽出のみ）
+        int[] outputSlots = getOutputSlots();
+        if (outputSlots.length > 0) {
+            bottomItemHandler = LazyOptional.of(() -> 
+                SidedItemHandler.createOutputHandler(inv, outputSlots));
+        }
+        
+        // 横方向: 入力と出力両方
+        int[] sideSlots = getSideAccessSlots();
+        if (sideSlots.length > 0) {
+            sideItemHandler = LazyOptional.of(() -> 
+                new SidedItemHandler(inv, sideSlots, true, true));
+        }
+        
+        // GUI用: 全スロット
+        directItemHandler = LazyOptional.of(this::getInventory);
     }
 
     // ==================== 抽象メソッド ====================
@@ -114,6 +152,29 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
     @Override
     public abstract Component getDisplayName();
 
+    // ==================== スロット設定（サブクラスでオーバーライド） ====================
+
+    /**
+     * 入力スロットのインデックス配列（上方向からのホッパーでアクセス）
+     */
+    protected int[] getInputSlots() {
+        return new int[0];
+    }
+
+    /**
+     * 出力スロットのインデックス配列（下方向からのホッパーでアクセス）
+     */
+    protected int[] getOutputSlots() {
+        return new int[0];
+    }
+
+    /**
+     * 横方向からアクセス可能なスロット（入出力両方）
+     */
+    protected int[] getSideAccessSlots() {
+        return new int[0];
+    }
+
     // ==================== Tier関連 ====================
 
     /**
@@ -160,7 +221,7 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
         // レシピ処理
         if (canProcess()) {
             didWork = processRecipe();
-            isProcessing = progress > 0;  // 処理中かどうか
+            isProcessing = progress > 0;
             
             // 熱発生（冷却コアがない場合のみ、処理完了時）
             if (didWork && !hasCoolingCore) {
@@ -170,17 +231,15 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
         // 冷却処理（処理中は冷却しない）
         if (isProcessing) {
-            // 処理中は冷却遅延タイマーをリセット
             coolingDelayTimer = COOLING_DELAY_TICKS;
         } else {
-            // 処理していない場合は冷却を試みる
             applyCooling();
         }
 
         // オーバーヒートチェック
         if (heatStorage.isOverheated()) {
             handleOverheat();
-            return;  // ブロックが変化したので終了
+            return;
         }
 
         // 状態更新
@@ -196,31 +255,23 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
     /**
      * 冷却処理
-     * - 処理終了後10秒（200tick）経過してから冷却開始
-     * - 冷却速度は1heat/sec（20tickに1回）
-     * - ファンがある場合は追加で1heat/sec
      */
     protected void applyCooling() {
-        // 冷却遅延タイマーがある場合はカウントダウン
         if (coolingDelayTimer > 0) {
             coolingDelayTimer--;
             return;
         }
 
-        // 熱がない場合は何もしない
         if (heatStorage.getHeat() <= 0) {
             return;
         }
 
-        // 1秒（20tick）に1回冷却
         coolingTickCounter++;
         if (coolingTickCounter >= 20) {
             coolingTickCounter = 0;
             
-            // 基本冷却: 1 heat/sec
             int cooling = 1;
             
-            // ファンボーナス: +1 heat/sec
             if (hasFan()) {
                 cooling += FAN_COOLING_BONUS;
             }
@@ -236,28 +287,23 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
     protected void handleOverheat() {
         if (level == null || level.isClientSide()) return;
 
-        // ファンがある場合は耐久を消費して回避
         int fanSlot = getFanSlotIndex();
         if (fanSlot >= 0) {
             ItemStack fanStack = getInventory().getStackInSlot(fanSlot);
             if (isFan(fanStack)) {
-                // ファン耐久消費
                 fanStack.setDamageValue(fanStack.getDamageValue() + 1);
                 if (fanStack.getDamageValue() >= fanStack.getMaxDamage()) {
                     fanStack.shrink(1);
                 }
-                // 熱を80%にリセット
                 heatStorage.resetToSafeLevel();
                 setChanged();
                 return;
             }
         }
 
-        // ファンがない場合はブロック変化
         MachineTier tier = getTier();
         Block frameBlock = ((AbstractMachineBlock) getBlockState().getBlock()).getMachineFrameBlock(tier);
         
-        // インベントリの中身をドロップ
         Container droppable = getDroppableInventory();
         for (int i = 0; i < droppable.getContainerSize(); i++) {
             ItemStack stack = droppable.getItem(i);
@@ -266,7 +312,6 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
             }
         }
 
-        // 機械筐体に変化
         level.setBlock(worldPosition, frameBlock.defaultBlockState(), 3);
     }
 
@@ -279,32 +324,20 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
     // ==================== 冷却アイテム判定 ====================
 
-    /**
-     * ファンかどうか判定
-     */
     protected boolean isFan(ItemStack stack) {
         return stack.is(ModItems.COOLING_FAN.get());
     }
 
-    /**
-     * 冷却コアかどうか判定
-     */
     protected boolean isCoolingCore(ItemStack stack) {
         return stack.is(ModItems.COOLING_CORE.get());
     }
 
-    /**
-     * ファンを持っているか
-     */
     protected boolean hasFan() {
         int fanSlot = getFanSlotIndex();
         if (fanSlot < 0) return false;
         return isFan(getInventory().getStackInSlot(fanSlot));
     }
 
-    /**
-     * 冷却コアを持っているか
-     */
     protected boolean hasCoolingCore() {
         int coreSlot = getCoolingCoreSlotIndex();
         if (coreSlot < 0) return false;
@@ -313,16 +346,10 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
 
     // ==================== 状態管理 ====================
 
-    /**
-     * 稼働中かどうか
-     */
     public boolean isActive() {
         return getBlockState().getValue(AbstractMachineBlock.ACTIVE);
     }
 
-    /**
-     * 稼働状態を設定
-     */
     protected void setActive(boolean active) {
         if (level != null && !level.isClientSide()) {
             BlockState state = level.getBlockState(worldPosition);
@@ -390,14 +417,51 @@ public abstract class AbstractMachineBlockEntity extends BlockEntity implements 
             return manaHandler.cast();
         }
         if (cap == ForgeCapabilities.ITEM_HANDLER) {
-            return LazyOptional.of(this::getInventory).cast();
+            // 方向ベースのハンドラーを返す
+            if (side == null) {
+                // GUI用（全スロット）
+                if (directItemHandler.isPresent()) {
+                    return directItemHandler.cast();
+                }
+                return LazyOptional.of(this::getInventory).cast();
+            }
+            
+            // ブロックの向きを考慮
+            Direction facing = getBlockState().hasProperty(AbstractMachineBlock.FACING) 
+                ? getBlockState().getValue(AbstractMachineBlock.FACING) 
+                : Direction.NORTH;
+            
+            // 相対的な方向に変換
+            Direction relativeSide = getRelativeDirection(side, facing);
+            
+            return switch (relativeSide) {
+                case UP -> topItemHandler.isPresent() ? topItemHandler.cast() : LazyOptional.empty();
+                case DOWN -> bottomItemHandler.isPresent() ? bottomItemHandler.cast() : LazyOptional.empty();
+                default -> sideItemHandler.isPresent() ? sideItemHandler.cast() : LazyOptional.empty();
+            };
         }
         return super.getCapability(cap, side);
+    }
+
+    /**
+     * ブロックの向きを考慮した相対方向を取得
+     */
+    private Direction getRelativeDirection(Direction side, Direction facing) {
+        // UP/DOWNはそのまま
+        if (side == Direction.UP || side == Direction.DOWN) {
+            return side;
+        }
+        // 横方向は相対的に変換
+        return side;
     }
 
     @Override
     public void invalidateCaps() {
         super.invalidateCaps();
         manaHandler.invalidate();
+        topItemHandler.invalidate();
+        bottomItemHandler.invalidate();
+        sideItemHandler.invalidate();
+        directItemHandler.invalidate();
     }
 }

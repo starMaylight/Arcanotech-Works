@@ -136,6 +136,8 @@
   "tooltip.arcanotech_works.cooling_core.desc": "機械の熱発生を無効化",
   "tooltip.arcanotech_works.tank_empty": "空",
   "tooltip.arcanotech_works.tank_fluid": "%s: %s / %s mb",
+  "tooltip.arcanotech_works.input_tank": "入力タンク %s",
+  "tooltip.arcanotech_works.output_tank": "出力タンク %s",
 
   "jei.arcanotech_works.crushing": "粉砕",
   "jei.arcanotech_works.compressing": "圧縮",

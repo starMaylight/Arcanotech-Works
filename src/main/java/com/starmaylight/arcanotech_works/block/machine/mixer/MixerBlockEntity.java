@@ -2,6 +2,7 @@ package com.starmaylight.arcanotech_works.block.machine.mixer;
 
 import com.starmaylight.arcanotech_works.block.machine.AbstractMachineBlockEntity;
 import com.starmaylight.arcanotech_works.block.machine.MachineTier;
+import com.starmaylight.arcanotech_works.block.machine.SidedItemHandler;
 import com.starmaylight.arcanotech_works.blockentity.ModBlockEntities;
 import com.starmaylight.arcanotech_works.recipe.MixerRecipe;
 import com.starmaylight.arcanotech_works.recipe.ModRecipes;
@@ -9,20 +10,33 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.common.util.LazyOptional;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.capability.IFluidHandler;
+import net.minecraftforge.fluids.capability.IFluidHandlerItem;
 import net.minecraftforge.fluids.capability.templates.FluidTank;
+import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -89,6 +103,7 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            syncToClient();
             currentRecipe = null;
         }
     };
@@ -97,6 +112,7 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            syncToClient();
             currentRecipe = null;
         }
     };
@@ -105,6 +121,7 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            syncToClient();
         }
     };
 
@@ -112,14 +129,23 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
         @Override
         protected void onContentsChanged() {
             setChanged();
+            syncToClient();
         }
     };
+
+    // 方向ベースのアイテムハンドラー
+    private LazyOptional<IItemHandler> topItemHandler = LazyOptional.empty();
+    private LazyOptional<IItemHandler> bottomItemHandler = LazyOptional.empty();
+    private LazyOptional<IItemHandler> sideItemHandler = LazyOptional.empty();
 
     // Fluid Handler LazyOptional
     private final LazyOptional<IFluidHandler> inputFluidHandler1 = LazyOptional.of(() -> inputTank1);
     private final LazyOptional<IFluidHandler> inputFluidHandler2 = LazyOptional.of(() -> inputTank2);
     private final LazyOptional<IFluidHandler> outputFluidHandler1 = LazyOptional.of(() -> outputTank1);
     private final LazyOptional<IFluidHandler> outputFluidHandler2 = LazyOptional.of(() -> outputTank2);
+    
+    // 全タンク統合ハンドラー（バケツ操作用）
+    private final LazyOptional<IFluidHandler> combinedFluidHandler = LazyOptional.of(() -> new CombinedFluidHandler());
 
     // GUI同期用データ（拡張版）
     protected final ContainerData data = new ContainerData() {
@@ -158,6 +184,192 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
 
     public MixerBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.MIXER.get(), pos, state);
+        initItemHandlers();
+    }
+
+    /**
+     * 方向ベースのアイテムハンドラーを初期化
+     */
+    private void initItemHandlers() {
+        topItemHandler = LazyOptional.of(() -> 
+            SidedItemHandler.createInputHandler(inventory, INPUT_SLOT_1, INPUT_SLOT_2, INPUT_SLOT_3, INPUT_SLOT_4));
+        
+        bottomItemHandler = LazyOptional.of(() -> 
+            SidedItemHandler.createOutputHandler(inventory, OUTPUT_SLOT));
+        
+        sideItemHandler = LazyOptional.of(() -> 
+            new SidedItemHandler(inventory, new int[]{INPUT_SLOT_1, INPUT_SLOT_2, INPUT_SLOT_3, INPUT_SLOT_4, OUTPUT_SLOT, COOLING_SLOT}, true, true));
+    }
+
+    // ==================== クライアント同期 ====================
+
+    /**
+     * クライアントに同期を送信
+     */
+    private void syncToClient() {
+        if (level != null && !level.isClientSide()) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = super.getUpdateTag();
+        // 液体データを追加
+        tag.put("InputTank1", inputTank1.writeToNBT(new CompoundTag()));
+        tag.put("InputTank2", inputTank2.writeToNBT(new CompoundTag()));
+        tag.put("OutputTank1", outputTank1.writeToNBT(new CompoundTag()));
+        tag.put("OutputTank2", outputTank2.writeToNBT(new CompoundTag()));
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag) {
+        super.handleUpdateTag(tag);
+        if (tag.contains("InputTank1")) {
+            inputTank1.readFromNBT(tag.getCompound("InputTank1"));
+        }
+        if (tag.contains("InputTank2")) {
+            inputTank2.readFromNBT(tag.getCompound("InputTank2"));
+        }
+        if (tag.contains("OutputTank1")) {
+            outputTank1.readFromNBT(tag.getCompound("OutputTank1"));
+        }
+        if (tag.contains("OutputTank2")) {
+            outputTank2.readFromNBT(tag.getCompound("OutputTank2"));
+        }
+    }
+
+    // ==================== 液体バケツ操作 ====================
+
+    /**
+     * プレイヤーのバケツ操作を処理
+     */
+    public InteractionResult handleBucketInteraction(Player player, InteractionHand hand) {
+        ItemStack heldItem = player.getItemInHand(hand);
+        
+        if (heldItem.isEmpty()) {
+            return InteractionResult.PASS;
+        }
+
+        Optional<IFluidHandlerItem> fluidHandlerItem = FluidUtil.getFluidHandler(heldItem).resolve();
+        
+        if (fluidHandlerItem.isEmpty()) {
+            return InteractionResult.PASS;
+        }
+
+        IFluidHandlerItem itemHandler = fluidHandlerItem.get();
+        FluidStack fluidInItem = itemHandler.getFluidInTank(0);
+        
+        if (!fluidInItem.isEmpty()) {
+            if (tryFillInputTank(player, hand, heldItem, fluidInItem)) {
+                return InteractionResult.SUCCESS;
+            }
+        } else {
+            if (tryDrainToContainer(player, hand, heldItem)) {
+                return InteractionResult.SUCCESS;
+            }
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    /**
+     * 入力タンクへの注入を試みる
+     * 異なる液体は異なるタンクに入れる
+     */
+    private boolean tryFillInputTank(Player player, InteractionHand hand, ItemStack container, FluidStack fluid) {
+        FluidTank targetTank = null;
+        
+        // まず空のタンクを探す（異なる液体用）
+        if (inputTank1.isEmpty()) {
+            targetTank = inputTank1;
+        } else if (inputTank2.isEmpty()) {
+            // tank1と同じ液体の場合はtank1に追加、異なる液体はtank2に
+            if (inputTank1.getFluid().isFluidEqual(fluid)) {
+                if (inputTank1.getFluidAmount() + 1000 <= TANK_CAPACITY) {
+                    targetTank = inputTank1;
+                }
+            } else {
+                targetTank = inputTank2;
+            }
+        } else {
+            // 両方のタンクに液体がある場合、同じ液体のタンクに追加
+            if (inputTank1.getFluid().isFluidEqual(fluid) && inputTank1.getFluidAmount() + 1000 <= TANK_CAPACITY) {
+                targetTank = inputTank1;
+            } else if (inputTank2.getFluid().isFluidEqual(fluid) && inputTank2.getFluidAmount() + 1000 <= TANK_CAPACITY) {
+                targetTank = inputTank2;
+            }
+        }
+        
+        if (targetTank == null) {
+            return false;
+        }
+
+        // 液体を注入
+        int filled = targetTank.fill(new FluidStack(fluid.getFluid(), 1000), IFluidHandler.FluidAction.EXECUTE);
+        
+        if (filled > 0) {
+            if (!player.isCreative()) {
+                player.setItemInHand(hand, new ItemStack(Items.BUCKET));
+            }
+            
+            if (level != null) {
+                level.playSound(null, worldPosition, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 1.0F, 1.0F);
+            }
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * タンクから空のバケツへ抽出を試みる
+     */
+    private boolean tryDrainToContainer(Player player, InteractionHand hand, ItemStack container) {
+        FluidTank sourceTank = null;
+        
+        // 出力タンクから優先
+        if (!outputTank1.isEmpty() && outputTank1.getFluidAmount() >= 1000) {
+            sourceTank = outputTank1;
+        } else if (!outputTank2.isEmpty() && outputTank2.getFluidAmount() >= 1000) {
+            sourceTank = outputTank2;
+        } else if (!inputTank1.isEmpty() && inputTank1.getFluidAmount() >= 1000) {
+            sourceTank = inputTank1;
+        } else if (!inputTank2.isEmpty() && inputTank2.getFluidAmount() >= 1000) {
+            sourceTank = inputTank2;
+        }
+        
+        if (sourceTank == null) {
+            return false;
+        }
+
+        FluidStack inTank = sourceTank.getFluid();
+        ItemStack filledBucket = ItemStack.EMPTY;
+        
+        if (inTank.getFluid() == Fluids.WATER) {
+            filledBucket = new ItemStack(Items.WATER_BUCKET);
+        } else if (inTank.getFluid() == Fluids.LAVA) {
+            filledBucket = new ItemStack(Items.LAVA_BUCKET);
+        }
+        
+        if (!filledBucket.isEmpty()) {
+            sourceTank.drain(1000, IFluidHandler.FluidAction.EXECUTE);
+            if (!player.isCreative()) {
+                player.setItemInHand(hand, filledBucket);
+            }
+            if (level != null) {
+                level.playSound(null, worldPosition, SoundEvents.BUCKET_FILL, SoundSource.BLOCKS, 1.0F, 1.0F);
+            }
+            return true;
+        }
+        
+        return false;
     }
 
     // ==================== 抽象メソッド実装 ====================
@@ -238,7 +450,6 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
             }
         }
 
-        // レシピを検索
         Optional<MixerRecipe> recipe = level.getRecipeManager()
                 .getAllRecipesFor(ModRecipes.MIXER_TYPE.get())
                 .stream()
@@ -258,7 +469,6 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
 
         MixerRecipe r = recipe.get();
 
-        // 出力スペースチェック
         if (!r.getResult().isEmpty()) {
             ItemStack output = inventory.getStackInSlot(OUTPUT_SLOT);
             if (!output.isEmpty()) {
@@ -267,7 +477,6 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
             }
         }
 
-        // 液体出力スペースチェック
         if (!r.getFluidOutput1().isEmpty()) {
             if (outputTank1.fill(r.getFluidOutput1(), IFluidHandler.FluidAction.SIMULATE) < r.getFluidOutput1().getAmount()) {
                 return false;
@@ -417,26 +626,110 @@ public class MixerBlockEntity extends AbstractMachineBlockEntity {
 
     @Override
     public @NotNull <T> LazyOptional<T> getCapability(@NotNull Capability<T> cap, @Nullable Direction side) {
-        if (cap == ForgeCapabilities.FLUID_HANDLER) {
-            if (side == Direction.UP) {
-                return inputFluidHandler1.cast();
-            } else if (side == Direction.DOWN) {
-                return outputFluidHandler1.cast();
-            } else if (side == Direction.NORTH || side == Direction.SOUTH) {
-                return inputFluidHandler2.cast();
-            } else {
-                return outputFluidHandler2.cast();
+        if (cap == ForgeCapabilities.ITEM_HANDLER) {
+            if (side == null) {
+                return LazyOptional.of(() -> inventory).cast();
             }
+            return switch (side) {
+                case UP -> topItemHandler.cast();
+                case DOWN -> bottomItemHandler.cast();
+                default -> sideItemHandler.cast();
+            };
         }
+        
+        if (cap == ForgeCapabilities.FLUID_HANDLER) {
+            if (side == null) {
+                return combinedFluidHandler.cast();
+            }
+            return switch (side) {
+                case UP -> inputFluidHandler1.cast();
+                case DOWN -> outputFluidHandler1.cast();
+                case NORTH, SOUTH -> inputFluidHandler2.cast();
+                default -> outputFluidHandler2.cast();
+            };
+        }
+        
         return super.getCapability(cap, side);
     }
 
     @Override
     public void invalidateCaps() {
         super.invalidateCaps();
+        topItemHandler.invalidate();
+        bottomItemHandler.invalidate();
+        sideItemHandler.invalidate();
         inputFluidHandler1.invalidate();
         inputFluidHandler2.invalidate();
         outputFluidHandler1.invalidate();
         outputFluidHandler2.invalidate();
+        combinedFluidHandler.invalidate();
+    }
+
+    // ==================== 統合液体ハンドラー ====================
+
+    private class CombinedFluidHandler implements IFluidHandler {
+        
+        @Override
+        public int getTanks() {
+            return 4;
+        }
+
+        @Override
+        public @NotNull FluidStack getFluidInTank(int tank) {
+            return switch (tank) {
+                case 0 -> inputTank1.getFluid();
+                case 1 -> inputTank2.getFluid();
+                case 2 -> outputTank1.getFluid();
+                case 3 -> outputTank2.getFluid();
+                default -> FluidStack.EMPTY;
+            };
+        }
+
+        @Override
+        public int getTankCapacity(int tank) {
+            return TANK_CAPACITY;
+        }
+
+        @Override
+        public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+            return true;
+        }
+
+        @Override
+        public int fill(FluidStack resource, FluidAction action) {
+            // 空のタンクまたは同じ液体のタンクを探す
+            if (inputTank1.isEmpty() || inputTank1.getFluid().isFluidEqual(resource)) {
+                int filled = inputTank1.fill(resource, action);
+                if (filled > 0) return filled;
+            }
+            if (inputTank2.isEmpty() || inputTank2.getFluid().isFluidEqual(resource)) {
+                return inputTank2.fill(resource, action);
+            }
+            return 0;
+        }
+
+        @Override
+        public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
+            FluidStack drained = outputTank1.drain(resource, action);
+            if (drained.isEmpty()) {
+                drained = outputTank2.drain(resource, action);
+            }
+            return drained;
+        }
+
+        @Override
+        public @NotNull FluidStack drain(int maxDrain, FluidAction action) {
+            FluidStack drained = outputTank1.drain(maxDrain, action);
+            if (drained.isEmpty()) {
+                drained = outputTank2.drain(maxDrain, action);
+            }
+            if (drained.isEmpty()) {
+                drained = inputTank1.drain(maxDrain, action);
+            }
+            if (drained.isEmpty()) {
+                drained = inputTank2.drain(maxDrain, action);
+            }
+            return drained;
+        }
     }
 }

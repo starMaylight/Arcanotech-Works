@@ -26,6 +26,11 @@ import java.util.Optional;
  * - スロット0: 入力
  * - スロット1: 出力
  * - スロット2: ファン/冷却コアスロット
+ * 
+ * ホッパー対応:
+ * - 上方向: 入力スロット（挿入のみ）
+ * - 下方向: 出力スロット（抽出のみ）
+ * - 横方向: 入力・出力・冷却スロット
  */
 public class CompressorBlockEntity extends AbstractMachineBlockEntity {
 
@@ -98,6 +103,24 @@ public class CompressorBlockEntity extends AbstractMachineBlockEntity {
 
     public CompressorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.COMPRESSOR.get(), pos, state);
+        initSidedHandlers();
+    }
+
+    // ==================== スロット設定 ====================
+
+    @Override
+    protected int[] getInputSlots() {
+        return new int[]{INPUT_SLOT};
+    }
+
+    @Override
+    protected int[] getOutputSlots() {
+        return new int[]{OUTPUT_SLOT};
+    }
+
+    @Override
+    protected int[] getSideAccessSlots() {
+        return new int[]{INPUT_SLOT, OUTPUT_SLOT, COOLING_SLOT};
     }
 
     // ==================== 抽象メソッド実装 ====================

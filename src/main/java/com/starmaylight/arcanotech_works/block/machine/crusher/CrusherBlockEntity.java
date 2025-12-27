@@ -26,6 +26,11 @@ import java.util.Optional;
  * - スロット0: 入力
  * - スロット1: 出力
  * - スロット2: ファン/冷却コアスロット
+ * 
+ * ホッパー対応:
+ * - 上方向: 入力スロット（挿入のみ）
+ * - 下方向: 出力スロット（抽出のみ）
+ * - 横方向: 入力・出力・冷却スロット
  */
 public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
@@ -50,7 +55,7 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
         protected void onContentsChanged(int slot) {
             setChanged();
             if (slot == INPUT_SLOT) {
-                currentRecipe = null;  // 入力変更時にレシピキャッシュをクリア
+                currentRecipe = null;
             }
         }
 
@@ -98,6 +103,24 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
     public CrusherBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.CRUSHER.get(), pos, state);
+        initSidedHandlers();  // 方向ベースのハンドラーを初期化
+    }
+
+    // ==================== スロット設定 ====================
+
+    @Override
+    protected int[] getInputSlots() {
+        return new int[]{INPUT_SLOT};
+    }
+
+    @Override
+    protected int[] getOutputSlots() {
+        return new int[]{OUTPUT_SLOT};
+    }
+
+    @Override
+    protected int[] getSideAccessSlots() {
+        return new int[]{INPUT_SLOT, OUTPUT_SLOT, COOLING_SLOT};
     }
 
     // ==================== 抽象メソッド実装 ====================
@@ -159,9 +182,6 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
     // ==================== レシピ処理 ====================
 
-    /**
-     * 現在の入力に対するレシピを取得
-     */
     private Optional<CrusherRecipe> getRecipe() {
         if (level == null) return Optional.empty();
         
@@ -213,7 +233,6 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
 
         CrusherRecipe recipe = recipeOpt.get();
 
-        // 処理時間を計算（レシピの処理時間 × Tierボーナス）
         MachineTier tier = getTier();
         int processTime = tier.calculateProcessTime(recipe.getProcessingTime());
 
@@ -224,7 +243,6 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
         progress++;
 
         if (progress >= maxProgress) {
-            // 処理完了
             inventory.extractItem(INPUT_SLOT, 1, false);
             
             ItemStack result = recipe.getResult();
@@ -236,7 +254,6 @@ public class CrusherBlockEntity extends AbstractMachineBlockEntity {
                 output.grow(result.getCount());
             }
 
-            // 魔力消費
             manaStorage.extractMana(getManaPerOperation(), false);
 
             progress = 0;

@@ -25,7 +25,7 @@ import net.minecraft.world.item.ItemStack;
 public class RollingMillRecipeCategory implements IRecipeCategory<RollingMillRecipe> {
 
     public static final ResourceLocation UID = new ResourceLocation(Arcanotech_works.MODID, "rolling");
-    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/gui/jei/rolling_mill.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/jei/rolling_mill.png");
     public static final RecipeType<RollingMillRecipe> RECIPE_TYPE = RecipeType.create(Arcanotech_works.MODID, "rolling", RollingMillRecipe.class);
 
     private final IDrawable background;
@@ -71,6 +71,6 @@ public class RollingMillRecipeCategory implements IRecipeCategory<RollingMillRec
 
     @Override
     public void draw(RollingMillRecipe recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
-        arrow.draw(guiGraphics, 24, 9);
+        arrow.draw(guiGraphics, 26, 8);
     }
 }

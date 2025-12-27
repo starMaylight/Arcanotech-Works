@@ -142,6 +142,8 @@
   "tooltip.arcanotech_works.cooling_core.desc": "Disables heat generation",
   "tooltip.arcanotech_works.tank_empty": "Empty",
   "tooltip.arcanotech_works.tank_fluid": "%s: %s / %s mb",
+  "tooltip.arcanotech_works.input_tank": "Input Tank %s",
+  "tooltip.arcanotech_works.output_tank": "Output Tank %s",
 
   "jei.arcanotech_works.crushing": "Crushing",
   "jei.arcanotech_works.compressing": "Compressing",

@@ -30,7 +30,7 @@ import java.util.List;
 public class MixerRecipeCategory implements IRecipeCategory<MixerRecipe> {
 
     public static final ResourceLocation UID = new ResourceLocation(Arcanotech_works.MODID, "mixing");
-    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/gui/jei/mixer.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/jei/mixer.png");
     public static final RecipeType<MixerRecipe> RECIPE_TYPE = RecipeType.create(Arcanotech_works.MODID, "mixing", MixerRecipe.class);
 
     private final IDrawable background;
@@ -44,7 +44,7 @@ public class MixerRecipeCategory implements IRecipeCategory<MixerRecipe> {
         this.icon = guiHelper.createDrawableIngredient(VanillaTypes.ITEM_STACK, new ItemStack(ModBlocks.MIXER.get()));
         
         // 矢印アニメーション（テクスチャの右端）
-        IDrawableStatic arrowStatic = guiHelper.createDrawable(TEXTURE, 116, 0, 24, 17);
+        IDrawableStatic arrowStatic = guiHelper.createDrawable(TEXTURE, 122, 0, 24, 17);
         this.arrow = guiHelper.createAnimatedDrawable(arrowStatic, 200, IDrawableAnimated.StartDirection.LEFT, false);
     }
 
@@ -124,6 +124,6 @@ public class MixerRecipeCategory implements IRecipeCategory<MixerRecipe> {
     @Override
     public void draw(MixerRecipe recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
         // 矢印を描画（背景内の適切な位置）
-        arrow.draw(guiGraphics, 58, 10);
+        arrow.draw(guiGraphics, 58, 9);
     }
 }

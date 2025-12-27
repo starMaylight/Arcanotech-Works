@@ -27,7 +27,7 @@ import java.util.Arrays;
 public class CompressorRecipeCategory implements IRecipeCategory<CompressorRecipe> {
 
     public static final ResourceLocation UID = new ResourceLocation(Arcanotech_works.MODID, "compressing");
-    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/gui/jei/compressor.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/jei/compressor.png");
     public static final RecipeType<CompressorRecipe> RECIPE_TYPE = RecipeType.create(Arcanotech_works.MODID, "compressing", CompressorRecipe.class);
 
     private final IDrawable background;
@@ -77,7 +77,7 @@ public class CompressorRecipeCategory implements IRecipeCategory<CompressorRecip
 
     @Override
     public void draw(CompressorRecipe recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
-        arrow.draw(guiGraphics, 24, 9);
+        arrow.draw(guiGraphics, 26, 8);
         
         // 入力個数を表示
         String countText = "x" + recipe.getInputCount();

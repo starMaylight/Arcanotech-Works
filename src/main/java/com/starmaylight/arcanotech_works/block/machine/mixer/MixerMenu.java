@@ -15,6 +15,10 @@ import net.minecraftforge.items.SlotItemHandler;
 
 /**
  * 混合機のメニュー（GUI）
+ * 
+ * レイアウト（JEIと統一）:
+ * [入力1][入力2][液入1]    ⟶    [液出1][出力]
+ * [入力3][入力4][液入2]         [液出2]
  */
 public class MixerMenu extends AbstractContainerMenu {
 
@@ -22,19 +26,23 @@ public class MixerMenu extends AbstractContainerMenu {
     private final Level level;
     private final ContainerData data;
 
-    // アイテム入力スロット位置（2x2グリッド）
-    private static final int INPUT_SLOT_1_X = 44;
-    private static final int INPUT_SLOT_1_Y = 17;
-    private static final int INPUT_SLOT_2_X = 62;
-    private static final int INPUT_SLOT_2_Y = 17;
-    private static final int INPUT_SLOT_3_X = 44;
-    private static final int INPUT_SLOT_3_Y = 35;
-    private static final int INPUT_SLOT_4_X = 62;
-    private static final int INPUT_SLOT_4_Y = 35;
+    // JEIレイアウト中央配置オフセット: (176 - 122) / 2 = 27
+    private static final int LAYOUT_OFFSET_X = 27;
+    private static final int LAYOUT_OFFSET_Y = 17;
 
-    // 出力スロット位置
-    private static final int OUTPUT_SLOT_X = 116;
-    private static final int OUTPUT_SLOT_Y = 35;
+    // アイテム入力スロット位置（2x2グリッド）- JEI座標 + オフセット
+    private static final int INPUT_SLOT_1_X = LAYOUT_OFFSET_X + 1;   // 28
+    private static final int INPUT_SLOT_1_Y = LAYOUT_OFFSET_Y + 1;   // 18
+    private static final int INPUT_SLOT_2_X = LAYOUT_OFFSET_X + 19;  // 46
+    private static final int INPUT_SLOT_2_Y = LAYOUT_OFFSET_Y + 1;   // 18
+    private static final int INPUT_SLOT_3_X = LAYOUT_OFFSET_X + 1;   // 28
+    private static final int INPUT_SLOT_3_Y = LAYOUT_OFFSET_Y + 19;  // 36
+    private static final int INPUT_SLOT_4_X = LAYOUT_OFFSET_X + 19;  // 46
+    private static final int INPUT_SLOT_4_Y = LAYOUT_OFFSET_Y + 19;  // 36
+
+    // 出力スロット位置 - JEI座標 + オフセット
+    private static final int OUTPUT_SLOT_X = LAYOUT_OFFSET_X + 105;  // 132
+    private static final int OUTPUT_SLOT_Y = LAYOUT_OFFSET_Y + 10;   // 27
 
     // 冷却スロット位置
     private static final int COOLING_SLOT_X = 8;

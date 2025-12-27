@@ -25,7 +25,7 @@ import net.minecraft.world.item.ItemStack;
 public class CrusherRecipeCategory implements IRecipeCategory<CrusherRecipe> {
 
     public static final ResourceLocation UID = new ResourceLocation(Arcanotech_works.MODID, "crushing");
-    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/gui/jei/crusher.png");
+    public static final ResourceLocation TEXTURE = new ResourceLocation(Arcanotech_works.MODID, "textures/jei/crusher.png");
     public static final RecipeType<CrusherRecipe> RECIPE_TYPE = RecipeType.create(Arcanotech_works.MODID, "crushing", CrusherRecipe.class);
 
     private final IDrawable background;
@@ -71,6 +71,6 @@ public class CrusherRecipeCategory implements IRecipeCategory<CrusherRecipe> {
 
     @Override
     public void draw(CrusherRecipe recipe, IRecipeSlotsView recipeSlotsView, GuiGraphics guiGraphics, double mouseX, double mouseY) {
-        arrow.draw(guiGraphics, 24, 9);
+        arrow.draw(guiGraphics, 26, 8);
     }
 }
